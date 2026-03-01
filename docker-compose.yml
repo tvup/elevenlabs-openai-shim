@@ -1,0 +1,9 @@
+services:
+  elevenlabs-shim:
+    build: .
+    container_name: elevenlabs-shim
+    restart: unless-stopped
+    ports:
+      - "8881:8881"
+    env_file:
+      - .env
