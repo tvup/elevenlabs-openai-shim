@@ -1,6 +1,6 @@
 # elevenlabs-openai-shim
 
-A thin proxy that exposes an OpenAI-compatible `/v1/audio/speech` endpoint backed by [ElevenLabs](https://elevenlabs.io) TTS. Drop it in front of any client that speaks the OpenAI speech API and get ElevenLabs voices without changing a line of client code.
+An adapter that exposes an OpenAI-compatible `/v1/audio/speech` endpoint backed by [ElevenLabs](https://elevenlabs.io) TTS. Drop it in front of any client that speaks the OpenAI speech API and get ElevenLabs voices without changing a line of client code.
 
 ## Quick start
 
@@ -65,8 +65,8 @@ curl -X POST http://localhost:8881/v1/audio/speech \
 
 The repo includes two implementations:
 
-- **`elevenlabs_openai_shim_streaming.py`** — Streams audio chunks as they arrive from ElevenLabs. Lower time-to-first-byte. **This is the default used by Docker.**
-- **`elevenlabs_openai_shim.py`** — Buffers the full response before returning. Simpler, but higher latency.
+- **`elevenlabs_openai_shim_streaming.py`** — Streams audio chunks back to the client as they are generated. Lower time-to-first-byte. **This is the default used by Docker.**
+- **`elevenlabs_openai_shim.py`** — Buffers the full audio response before returning. Simpler, but higher latency.
 
 ## Audio format note
 
