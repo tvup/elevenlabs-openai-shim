@@ -36,6 +36,8 @@ Set these in `.env`:
 | `XI_API_KEY` | Yes | ElevenLabs API key |
 | `ELEVENLABS_VOICE_ID` | Yes | Default voice ID (used when request omits `voice`) |
 | `ELEVENLABS_MODEL_ID` | No | Model ID (defaults to `eleven_multilingual_v2`). See [available models](https://elevenlabs.io/docs/api-reference/get-models) |
+| `ALLOWED_IPS` | No | Comma-separated whitelist of IPs with unlimited access. When set, all other IPs are limited to `CHAR_LIMIT` characters. Unset = no limit. |
+| `CHAR_LIMIT` | No | Max characters for non-whitelisted IPs (default: `2000`). Only active when `ALLOWED_IPS` is set. |
 
 ## Usage
 

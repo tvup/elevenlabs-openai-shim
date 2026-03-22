@@ -49,6 +49,8 @@ Both expose:
 | `XI_API_KEY` | Yes | ElevenLabs API key |
 | `ELEVENLABS_VOICE_ID` | Yes | Default voice ID (used when request omits `voice`) |
 | `ELEVENLABS_MODEL_ID` | No | Default model (defaults to `eleven_multilingual_v2`) |
+| `ALLOWED_IPS` | No | Comma-separated whitelist of IPs. When set, non-listed IPs are capped at `CHAR_LIMIT` chars. Unset = no limit. |
+| `CHAR_LIMIT` | No | Max characters for non-whitelisted IPs (default: `2000`). Only active when `ALLOWED_IPS` is set. |
 
 ## Dependencies
 

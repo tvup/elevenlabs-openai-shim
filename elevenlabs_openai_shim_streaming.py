@@ -46,7 +46,7 @@ from typing import Optional
 
 from dotenv import load_dotenv
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -69,10 +69,18 @@ DEFAULT_MODEL_ID = os.getenv("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")
 # Set to None to let the client choose via request parameters.
 PINNED_FORMAT: Optional[str] = "wav"
 
+# IP-based character limit. Empty ALLOWED_IPS disables the feature entirely.
+_allowed_raw = os.getenv("ALLOWED_IPS", "")
+ALLOWED_IPS: set[str] = {ip.strip() for ip in _allowed_raw.split(",") if ip.strip()} if _allowed_raw else set()
+CHAR_LIMIT = int(os.getenv("CHAR_LIMIT", "2000"))
+char_usage: dict[str, int] = {}
+
 if not XI_API_KEY:
     logger.warning("XI_API_KEY is not set — requests will fail until configured")
 if not DEFAULT_VOICE_ID:
     logger.warning("ELEVENLABS_VOICE_ID is not set — requests without explicit voice will fail")
+if ALLOWED_IPS:
+    logger.info("Character limit active: %d chars for non-whitelisted IPs", CHAR_LIMIT)
 
 http_client: Optional[httpx.AsyncClient] = None
 
@@ -99,6 +107,13 @@ class SpeechRequest(BaseModel):
     format: Optional[str] = "wav"
 
 
+def get_client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
 def resolve_format(fmt: str) -> tuple[str, str]:
     """Map a requested format to an ElevenLabs output_format and HTTP content type."""
     if fmt in ("mp3", "mpeg"):
@@ -118,7 +133,7 @@ async def health():
 
 
 @app.post("/v1/audio/speech")
-async def audio_speech(req: SpeechRequest):
+async def audio_speech(req: SpeechRequest, request: Request):
     if not XI_API_KEY:
         raise HTTPException(status_code=500, detail="Missing XI_API_KEY env var")
 
@@ -144,6 +159,15 @@ async def audio_speech(req: SpeechRequest):
             media_type=content_type,
             headers={"Transfer-Encoding": "chunked"},
         )
+
+    # IP-based character limit (skipped for easter egg above).
+    if ALLOWED_IPS:
+        client_ip = get_client_ip(request)
+        if client_ip not in ALLOWED_IPS:
+            char_usage[client_ip] = char_usage.get(client_ip, 0) + len(req.input)
+            if char_usage[client_ip] > CHAR_LIMIT:
+                logger.warning("Char limit exceeded for %s (%d/%d)", client_ip, char_usage[client_ip], CHAR_LIMIT)
+                raise HTTPException(status_code=422, detail="Character limit exceeded")
 
     model_id = req.model or DEFAULT_MODEL_ID
 
