@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A thin Python shim that translates OpenAI-compatible `/v1/audio/speech` TTS requests into ElevenLabs API calls. Any client expecting the OpenAI speech endpoint can use ElevenLabs voices transparently.
+A Python shim that accepts OpenAI-compatible `/v1/audio/speech` requests and generates speech using ElevenLabs. The request shape is compatible with OpenAI-style clients, but the server does not implement full OpenAI speech behavior — only the `input` field is used for synthesis. All other parameters (voice, model, format) are controlled server-side via environment variables.
 
 ## Running the Service
 
@@ -37,19 +37,22 @@ Both expose:
 
 ## Key Behavior
 
-- **PINNED_FORMAT**: Hardcoded to `"wav"` in both files. Overrides any client-requested format. Set to `None` to respect client requests.
-- **Format mapping**: `"mp3"`/`"mpeg"` → ElevenLabs `mp3_44100_128`; anything else → `pcm_24000` (raw headerless PCM, not a standard WAV file).
-- **Voice/model resolution**: Request fields override env vars (`ELEVENLABS_VOICE_ID`, `ELEVENLABS_MODEL_ID`). Model defaults to `eleven_multilingual_v2`.
-- **Easter egg**: Voice `the-voice-in-your-head` returns a pre-generated "The Force" audio clip from `static/` without calling ElevenLabs.
+- **Server-side config**: Voice, model, and output format are controlled entirely by environment variables. Client-sent `voice`, `model`, `response_format`, `speed`, `instructions`, and `stream_format` fields are accepted for compatibility but ignored.
+- **Input validation**: `input` is required, must be a non-empty string, max 4096 characters.
+- **Output format**: Controlled by `DEFAULT_FORMAT` (ElevenLabs format) and `DEFAULT_CONTENT_TYPE` (HTTP response content type). Default is `pcm_24000` with `audio/wav` content type. Note: `pcm_24000` returns raw headerless PCM, not a valid WAV file.
+- **Easter egg**: Voice `the-voice-in-your-head` returns a canned audio clip from `static/the_force.pcm` without calling ElevenLabs.
+- **Request schema**: `schemas/openai-compatible-audio-speech-request.schema.json`
 
 ## Environment Variables (`.env`)
 
 | Variable | Required | Description |
 |---|---|---|
 | `XI_API_KEY` | Yes | ElevenLabs API key |
-| `ELEVENLABS_VOICE_ID` | Yes | Default voice ID (used when request omits `voice`) |
-| `ELEVENLABS_MODEL_ID` | No | Default model (defaults to `eleven_multilingual_v2`) |
-| `ALLOWED_IPS` | No | Comma-separated whitelist of IPs. When set, non-listed IPs are capped at `CHAR_LIMIT` chars. Unset = no limit. |
+| `ELEVENLABS_VOICE_ID` | Yes | Server-side voice ID. See [voices docs](https://elevenlabs.io/docs/api-reference/get-voices). |
+| `ELEVENLABS_MODEL_ID` | No | Server-side model (defaults to `eleven_multilingual_v2`). See [available models](https://elevenlabs.io/docs/api-reference/get-models). |
+| `DEFAULT_FORMAT` | No | ElevenLabs output format (default: `pcm_24000`) |
+| `DEFAULT_CONTENT_TYPE` | No | Response content type (default: `audio/wav`) |
+| `ALLOWED_IPS` | No | Comma-separated whitelist of IPs with unlimited access. When set, all other IPs are limited to `CHAR_LIMIT` characters. Unset = no limit. |
 | `CHAR_LIMIT` | No | Max characters for non-whitelisted IPs (default: `2000`). Only active when `ALLOWED_IPS` is set. |
 
 ## Dependencies
