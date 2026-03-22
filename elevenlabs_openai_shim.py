@@ -1,9 +1,19 @@
 """
 ElevenLabs OpenAI Shim — OpenAI-compatible /v1/audio/speech endpoint.
 
-A thin compatibility layer that translates OpenAI-style TTS requests into
-ElevenLabs API calls, so any client expecting the OpenAI speech endpoint
-can use ElevenLabs voices instead.
+This service accepts an OpenAI-compatible JSON request body for
+`/v1/audio/speech`, but it does not implement full OpenAI speech behavior.
+
+Compatibility
+-------------
+Only the `input` field is used for speech synthesis.
+
+Other request fields may be present for compatibility with OpenAI-style
+clients, but they are ignored by this server unless explicitly documented
+otherwise.
+
+This makes it possible for existing clients to switch the endpoint URL to
+this service while continuing to send the same general request shape.
 
 Setup
 -----
@@ -13,9 +23,11 @@ Setup
 
 Configuration (.env)
 --------------------
-    XI_API_KEY=sk_...                          # Required – ElevenLabs API key
-    ELEVENLABS_VOICE_ID=abc123                 # Required – default voice ID
-    ELEVENLABS_MODEL_ID=eleven_multilingual_v2 # Optional – model override
+    XI_API_KEY=sk_...                           # Required – ElevenLabs API key
+    ELEVENLABS_VOICE_ID=abc123                  # Required – server-side voice ID
+    ELEVENLABS_MODEL_ID=eleven_multilingual_v2 # Optional – server-side model
+    DEFAULT_FORMAT=pcm_24000                   # Optional – ElevenLabs output format
+    DEFAULT_CONTENT_TYPE=audio/wav             # Optional – response content type
 
 Run
 ---
@@ -25,29 +37,40 @@ Example request
 ---------------
     curl -X POST http://127.0.0.1:8881/v1/audio/speech \\
          -H "Content-Type: application/json" \\
-         -d '{"input": "Hello world", "format": "mp3"}' \\
-         --output speech.mp3
+         -d '{"input": "Hello world"}' \\
+         --output speech.audio
+
+Behavior
+--------
+- `input` is required and is the only field used for synthesis.
+- Other OpenAI-style fields such as `model`, `voice`, `instructions`,
+  `response_format`, `speed`, and `stream_format` are accepted for
+  compatibility but ignored.
+- Speech generation is controlled by server-side configuration.
 
 Audio format note
 -----------------
-    When format is "wav", ElevenLabs returns raw headerless PCM via their
-    pcm_24000 output format (24 kHz, 16-bit, mono). This is NOT a valid WAV
-    file — it contains no RIFF/WAV header. Clients must handle the raw PCM
-    stream directly or wrap it in a WAV container themselves.
+The response format is controlled by the server configuration, not by the
+incoming request body.
 
-    MP3 output (mp3_44100_128) is a standard self-contained file.
+When `DEFAULT_FORMAT` is set to `pcm_24000`, ElevenLabs returns raw
+headerless PCM audio (24 kHz, 16-bit, mono). This is NOT a valid WAV file,
+even if the response content type is configured as `audio/wav`, because no
+RIFF/WAV header is included.
+
+Clients that require a real WAV file must wrap the PCM stream in a WAV
+container themselves, or the server must be changed to do so.
 """
 
 import logging
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from dotenv import load_dotenv
 import httpx
 from fastapi import FastAPI, HTTPException, Request, Response
-from pydantic import BaseModel
 
 EASTER_EGG_VOICE = "the-voice-in-your-head"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -63,10 +86,8 @@ logger = logging.getLogger(__name__)
 XI_API_KEY = os.getenv("XI_API_KEY", "")
 DEFAULT_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "")
 DEFAULT_MODEL_ID = os.getenv("ELEVENLABS_MODEL_ID", "eleven_multilingual_v2")
-
-# Set to a format string (e.g. "wav", "mp3") to override client-requested format.
-# Set to None to let the client choose via request parameters.
-PINNED_FORMAT: Optional[str] = "wav"
+DEFAULT_FORMAT = os.getenv("DEFAULT_FORMAT", "pcm_24000")
+DEFAULT_CONTENT_TYPE = os.getenv("DEFAULT_CONTENT_TYPE", "audio/wav")
 
 # IP-based character limit. Empty ALLOWED_IPS disables the feature entirely.
 _allowed_raw = os.getenv("ALLOWED_IPS", "")
@@ -77,34 +98,54 @@ char_usage: dict[str, int] = {}
 if not XI_API_KEY:
     logger.warning("XI_API_KEY is not set — requests will fail until configured")
 if not DEFAULT_VOICE_ID:
-    logger.warning("ELEVENLABS_VOICE_ID is not set — requests without explicit voice will fail")
+    logger.warning("ELEVENLABS_VOICE_ID is not set — requests will fail until configured")
 if ALLOWED_IPS:
     logger.info("Character limit active: %d chars for non-whitelisted IPs", CHAR_LIMIT)
 
 http_client: Optional[httpx.AsyncClient] = None
 
+async def get_payload(request: Request) -> dict[str, Any]:
+    try:
+        payload: Any = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Request body must be valid JSON")
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Request body must be a JSON object")
+
+    return payload
+
+
+def get_input_text(payload: dict[str, Any]) -> str:
+    if "input" not in payload:
+        raise HTTPException(status_code=400, detail="Missing required field: input")
+
+    input_value = payload["input"]
+
+    if not isinstance(input_value, str):
+        raise HTTPException(status_code=400, detail="Field 'input' must be a string")
+
+    input_value = input_value.strip()
+
+    if not input_value:
+        raise HTTPException(status_code=400, detail="Field 'input' must not be empty")
+
+    if len(input_value) > 4096:
+        raise HTTPException(status_code=400, detail="Field 'input' exceeds maximum length of 4096 characters")
+
+    return input_value
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global http_client
     http_client = httpx.AsyncClient(timeout=60)
     logger.info("ElevenLabs OpenAI shim started")
-    logger.info("Pinned format: %s", PINNED_FORMAT or "none (client chooses)")
     yield
     await http_client.aclose()
     logger.info("ElevenLabs OpenAI shim stopped")
 
 
 app = FastAPI(title="ElevenLabs OpenAI Shim", lifespan=lifespan)
-
-
-class SpeechRequest(BaseModel):
-    input: str
-    model: Optional[str] = None
-    voice: Optional[str] = None
-    response_format: Optional[str] = None
-    format: Optional[str] = "wav"
-
 
 def get_client_ip(request: Request) -> str:
     forwarded = request.headers.get("x-forwarded-for")
@@ -113,76 +154,67 @@ def get_client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def resolve_format(fmt: str) -> tuple[str, str]:
-    """Map a requested format to an ElevenLabs output_format and HTTP content type."""
-    if fmt in ("mp3", "mpeg"):
-        return "mp3_44100_128", "audio/mpeg"
-    # "wav" / "wave" / anything else → raw PCM (see docstring at top of file).
-    return "pcm_24000", "audio/wav"
-
-
 @app.get("/health")
 async def health():
     return {
         "status": "ok",
         "api_key_set": bool(XI_API_KEY),
-        "default_voice_set": bool(DEFAULT_VOICE_ID),
-        "pinned_format": PINNED_FORMAT,
+        "default_voice_set": bool(DEFAULT_VOICE_ID)
     }
 
 
 @app.post("/v1/audio/speech")
-async def audio_speech(req: SpeechRequest, request: Request):
+async def audio_speech(request: Request):
     if not XI_API_KEY:
         raise HTTPException(status_code=500, detail="Missing XI_API_KEY env var")
 
-    voice_id = req.voice or DEFAULT_VOICE_ID
-    if not voice_id:
+    if not DEFAULT_VOICE_ID:
         raise HTTPException(status_code=500, detail="Missing ELEVENLABS_VOICE_ID env var")
 
-    # Pinned format takes precedence; otherwise honour the client's choice.
-    if PINNED_FORMAT:
-        fmt = PINNED_FORMAT
-    else:
-        fmt = (req.response_format or req.format or "wav").lower()
-
-    output_format, content_type = resolve_format(fmt)
+    payload = await get_payload(request)
 
     # Easter egg: return a canned "The Force" audio clip.
-    if voice_id == EASTER_EGG_VOICE:
+    if payload.get("voice") == EASTER_EGG_VOICE:
         logger.info("Easter egg activated: the-voice-in-your-head")
-        static_file = STATIC_DIR / ("the_force.mp3" if fmt in ("mp3", "mpeg") else "the_force.pcm")
-        return Response(content=static_file.read_bytes(), media_type=content_type)
+        static_file = STATIC_DIR / "the_force.pcm"
+        if not static_file.exists():
+            raise HTTPException(status_code=500, detail="Missing easter egg audio file")
+        return Response(content=static_file.read_bytes(), media_type=DEFAULT_CONTENT_TYPE)
+
+    input_text = get_input_text(payload)
 
     # IP-based character limit (skipped for easter egg above).
     if ALLOWED_IPS:
         client_ip = get_client_ip(request)
         if client_ip not in ALLOWED_IPS:
-            char_usage[client_ip] = char_usage.get(client_ip, 0) + len(req.input)
+            char_usage[client_ip] = char_usage.get(client_ip, 0) + len(input_text)
             if char_usage[client_ip] > CHAR_LIMIT:
                 logger.warning("Char limit exceeded for %s (%d/%d)", client_ip, char_usage[client_ip], CHAR_LIMIT)
                 raise HTTPException(status_code=429, detail="Character limit exceeded")
 
     logger.info(
         "TTS request: voice=%s model=%s format=%s chars=%d",
-        voice_id,
-        req.model or DEFAULT_MODEL_ID,
-        output_format,
-        len(req.input),
+        DEFAULT_VOICE_ID,
+        DEFAULT_MODEL_ID,
+        DEFAULT_FORMAT,
+        len(input_text),
     )
 
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}?output_format={output_format}"
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{DEFAULT_VOICE_ID}?output_format={DEFAULT_FORMAT}"
+
+    if http_client is None:
+        raise HTTPException(status_code=500, detail="HTTP client is not initialized")
 
     r = await http_client.post(
         url,
         headers={
             "xi-api-key": XI_API_KEY,
             "Content-Type": "application/json",
-            "Accept": content_type,
+            "Accept": DEFAULT_CONTENT_TYPE,
         },
         json={
-            "text": req.input,
-            "model_id": req.model or DEFAULT_MODEL_ID,
+            "text": input_text,
+            "model_id": DEFAULT_MODEL_ID,
         },
     )
 
@@ -195,4 +227,4 @@ async def audio_speech(req: SpeechRequest, request: Request):
         raise HTTPException(status_code=r.status_code, detail=detail)
 
     logger.info("TTS response: %d bytes", len(r.content))
-    return Response(content=r.content, media_type=content_type)
+    return Response(content=r.content, media_type=DEFAULT_CONTENT_TYPE)
