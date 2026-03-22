@@ -60,9 +60,6 @@ RIFF/WAV header is included.
 
 Clients that require a real WAV file must wrap the PCM stream in a WAV
 container themselves, or the server must be changed to do so.
-
-If you configure an ElevenLabs MP3 output format instead, the response will
-be a normal self-contained MP3 file.
 """
 
 import logging
