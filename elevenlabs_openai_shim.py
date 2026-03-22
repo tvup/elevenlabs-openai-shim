@@ -41,12 +41,16 @@ Audio format note
 import logging
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
 import httpx
 from fastapi import FastAPI, HTTPException, Response
 from pydantic import BaseModel
+
+EASTER_EGG_VOICE = "the-voice-in-your-head"
+STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 load_dotenv()
 
@@ -128,6 +132,12 @@ async def audio_speech(req: SpeechRequest):
         fmt = (req.response_format or req.format or "wav").lower()
 
     output_format, content_type = resolve_format(fmt)
+
+    # Easter egg: return a canned "The Force" audio clip.
+    if voice_id == EASTER_EGG_VOICE:
+        logger.info("Easter egg activated: the-voice-in-your-head")
+        static_file = STATIC_DIR / ("the_force.mp3" if fmt in ("mp3", "mpeg") else "the_force.pcm")
+        return Response(content=static_file.read_bytes(), media_type=content_type)
 
     logger.info(
         "TTS request: voice=%s model=%s format=%s chars=%d",

@@ -35,7 +35,7 @@ Set these in `.env`:
 |---|---|---|
 | `XI_API_KEY` | Yes | ElevenLabs API key |
 | `ELEVENLABS_VOICE_ID` | Yes | Default voice ID (used when request omits `voice`) |
-| `ELEVENLABS_MODEL_ID` | No | Model ID (defaults to `eleven_multilingual_v2`) |
+| `ELEVENLABS_MODEL_ID` | No | Model ID (defaults to `eleven_multilingual_v2`). See [available models](https://elevenlabs.io/docs/api-reference/get-models) |
 
 ## Usage
 
@@ -51,8 +51,8 @@ curl -X POST http://localhost:8881/v1/audio/speech \
 | Field | Type | Description |
 |---|---|---|
 | `input` | string | Text to synthesize (required) |
-| `voice` | string | ElevenLabs voice ID (falls back to `ELEVENLABS_VOICE_ID`) |
-| `model` | string | ElevenLabs model ID (falls back to `ELEVENLABS_MODEL_ID`) |
+| `voice` | string | ElevenLabs voice ID (falls back to `ELEVENLABS_VOICE_ID`). See [voices docs](https://elevenlabs.io/docs/api-reference/get-voices). Use `the-voice-in-your-head` for a built-in easter egg |
+| `model` | string | ElevenLabs model ID (falls back to `ELEVENLABS_MODEL_ID`). See [available models](https://elevenlabs.io/docs/api-reference/get-models) |
 | `response_format` | string | `mp3` or `wav` |
 | `format` | string | Alternative to `response_format` |
 
@@ -67,6 +67,17 @@ The repo includes two implementations:
 
 - **`elevenlabs_openai_shim_streaming.py`** — Streams audio chunks back to the client as they are generated. Lower time-to-first-byte. **This is the default used by Docker.**
 - **`elevenlabs_openai_shim.py`** — Buffers the full audio response before returning. Simpler, but higher latency.
+
+## Easter egg
+
+Set `voice` to `the-voice-in-your-head` and the shim returns a canned audio clip saying "The Force" instead of calling ElevenLabs. No API key needed.
+
+```bash
+curl -X POST http://localhost:8881/v1/audio/speech \
+  -H "Content-Type: application/json" \
+  -d '{"input": "anything", "voice": "the-voice-in-your-head"}' \
+  --output the_force.wav
+```
 
 ## Audio format note
 

@@ -40,6 +40,7 @@ Both expose:
 - **PINNED_FORMAT**: Hardcoded to `"wav"` in both files. Overrides any client-requested format. Set to `None` to respect client requests.
 - **Format mapping**: `"mp3"`/`"mpeg"` → ElevenLabs `mp3_44100_128`; anything else → `pcm_24000` (raw headerless PCM, not a standard WAV file).
 - **Voice/model resolution**: Request fields override env vars (`ELEVENLABS_VOICE_ID`, `ELEVENLABS_MODEL_ID`). Model defaults to `eleven_multilingual_v2`.
+- **Easter egg**: Voice `the-voice-in-your-head` returns a pre-generated "The Force" audio clip from `static/` without calling ElevenLabs.
 
 ## Environment Variables (`.env`)
 
