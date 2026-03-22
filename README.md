@@ -1,6 +1,6 @@
 # elevenlabs-openai-shim
 
-An adapter that accepts an OpenAI-compatible `/v1/audio/speech` request shape and generates speech using ElevenLabs. [ElevenLabs](https://elevenlabs.io).
+An adapter that accepts an OpenAI-compatible `/v1/audio/speech` request shape and generates speech using [ElevenLabs](https://elevenlabs.io).
 
 This project is request-shape compatible with OpenAI-style speech clients, but it does not implement full OpenAI speech behavior.
 
@@ -33,14 +33,14 @@ uvicorn elevenlabs_openai_shim_streaming:app --host 127.0.0.1 --port 8881
 
 Set these in `.env`:
 
-| Variable | Required | Description |
-|---|---|---|
-| `XI_API_KEY` | Yes | ElevenLabs API key |
-| `ELEVENLABS_VOICE_ID` | Yes | Default voice ID See [voices docs](https://elevenlabs.io/docs/api-reference/get-voices). |
-| `ELEVENLABS_MODEL_ID` | No | Model ID (defaults to `eleven_multilingual_v2`). See [available models](https://elevenlabs.io/docs/api-reference/get-models) |
-| `ALLOWED_IPS` | No | Comma-separated whitelist of IPs with unlimited access. When set, all other IPs are limited to `CHAR_LIMIT` characters. Unset = no limit. |
-| `CHAR_LIMIT` | No | Max characters for non-whitelisted IPs (default: `2000`). Only active when `ALLOWED_IPS` is set. |
-| `DEFAULT_FORMAT` | No | ElevenLabs output format. Default: `pcm_24000` |
+| Variable               | Required | Description |
+|------------------------|---|---|
+| `XI_API_KEY`           | Yes | ElevenLabs API key |
+| `ELEVENLABS_VOICE_ID`  | Yes | Default voice ID See [voices docs](https://elevenlabs.io/docs/api-reference/get-voices). |
+| `ELEVENLABS_MODEL_ID`  | No | Model ID (defaults to `eleven_multilingual_v2`). See [available models](https://elevenlabs.io/docs/api-reference/get-models) |
+| `ALLOWED_IPS`          | No | Comma-separated whitelist of IPs with unlimited access. When set, all other IPs are limited to `CHAR_LIMIT` characters. Unset = no limit. |
+| `CHAR_LIMIT`           | No | Max characters for non-whitelisted IPs (default: `2000`). Only active when `ALLOWED_IPS` is set. |
+| `DEFAULT_FORMAT`       | No | ElevenLabs output format. Default: `pcm_24000` |
 | `DEFAULT_CONTENT_TYPE` | No | 	Response content type. Default: `audio/wav` |
 
 ## Usage
@@ -67,7 +67,6 @@ curl -X POST http://localhost:8881/v1/audio/speech \
 | `instructions`    | string | Accepted for compatibility. Ignored by this server. |
 | `speed`           | number | Accepted for compatibility. Ignored by this server. |
 | `stream_format`   | string | Accepted for compatibility. Ignored by this server. |
-Request schema: `schemas/openai-compatible-audio-speech-request.schema.json`
 
 ### Endpoints
 
@@ -83,7 +82,7 @@ The repo includes two implementations:
 
 ## Easter egg
 
-If `voice` is set  to `the-voice-in-your-head` the shim returns a canned audio clip instead of calling ElevenLabs..
+If `voice` is set to `the-voice-in-your-head` the shim returns a canned audio clip instead of calling ElevenLabs..
 
 ```bash
 curl -X POST http://localhost:8881/v1/audio/speech \
