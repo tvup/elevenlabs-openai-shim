@@ -167,7 +167,7 @@ async def audio_speech(req: SpeechRequest, request: Request):
             char_usage[client_ip] = char_usage.get(client_ip, 0) + len(req.input)
             if char_usage[client_ip] > CHAR_LIMIT:
                 logger.warning("Char limit exceeded for %s (%d/%d)", client_ip, char_usage[client_ip], CHAR_LIMIT)
-                raise HTTPException(status_code=422, detail="Character limit exceeded")
+                raise HTTPException(status_code=429, detail="Character limit exceeded")
 
     model_id = req.model or DEFAULT_MODEL_ID
 
