@@ -3,3 +3,6 @@
 __pycache__/
 *.pyc
 .forge-*
+.idea/workspace.xml
+.idea/php.xml
+*.iml
