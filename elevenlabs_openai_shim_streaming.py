@@ -170,11 +170,16 @@ async def health():
 
 @app.post("/v1/audio/speech")
 async def audio_speech(request: Request):
-    if not XI_API_KEY:
-        raise HTTPException(status_code=500, detail="Missing XI_API_KEY env var")
-
     if not DEFAULT_VOICE_ID:
         raise HTTPException(status_code=500, detail="Missing ELEVENLABS_VOICE_ID env var")
+
+    # Use API key from Authorization header if provided, otherwise fall back to server default.
+    auth_header = request.headers.get("authorization", "")
+    api_key = auth_header.removeprefix("Bearer ").strip() if auth_header.lower().startswith("bearer ") else ""
+    if not api_key:
+        api_key = XI_API_KEY
+    if not api_key:
+        raise HTTPException(status_code=500, detail="Missing API key: set XI_API_KEY env var or pass Authorization header")
 
     payload = await get_payload(request)
 
@@ -193,6 +198,11 @@ async def audio_speech(request: Request):
     req_voice = payload.get("voice")
     voice_id = req_voice if isinstance(req_voice, str) and re.fullmatch(r"[a-zA-Z0-9]{20}", req_voice) else DEFAULT_VOICE_ID
 
+    # Use model from request if it looks like an ElevenLabs model ID,
+    # otherwise fall back to server default. OpenAI-style names like "tts-1" are ignored.
+    req_model = payload.get("model")
+    model_id = req_model if isinstance(req_model, str) and req_model.startswith("eleven_") else DEFAULT_MODEL_ID
+
     # IP-based character limit (skipped for easter egg above).
     if ALLOWED_IPS:
         client_ip = get_client_ip(request)
@@ -205,7 +215,7 @@ async def audio_speech(request: Request):
     logger.info(
         "TTS request: voice=%s model=%s format=%s chars=%d",
         voice_id,
-        DEFAULT_MODEL_ID,
+        model_id,
         DEFAULT_FORMAT,
         len(input_text),
     )
@@ -219,13 +229,13 @@ async def audio_speech(request: Request):
             "POST",
             url,
             headers={
-                "xi-api-key": XI_API_KEY,
+                "xi-api-key": api_key,
                 "Content-Type": "application/json",
                 "Accept": DEFAULT_CONTENT_TYPE,
             },
             json={
                 "text": input_text,
-                "model_id": DEFAULT_MODEL_ID,
+                "model_id": model_id,
             },
         ),
         stream=True,

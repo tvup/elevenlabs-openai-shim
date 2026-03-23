@@ -57,12 +57,22 @@ curl -X POST http://localhost:8881/v1/audio/speech \
   --output speech.audio
 ```
 
+### Authentication
+
+The server uses the ElevenLabs API key from the `XI_API_KEY` environment variable by default. To override this per-request, pass your own key via the `Authorization` header:
+
+```
+Authorization: Bearer <your-elevenlabs-api-key>
+```
+
+This is compatible with OpenAI client libraries that send a Bearer token. When provided, the request is billed to the key owner's ElevenLabs account instead of the server default.
+
 ### Request body
 | Field             | Type | Description                   |
 |-------------------|---|-------------------------------|
 | `input`           | string | Text to synthesize. Required. This is the only field used for synthesis. |
 | `voice`           | string or object | Accepted for compatibility. If the value matches the ElevenLabs voice ID format (20-char alphanumeric, e.g. `21m00Tcm4TlvDq8ikWAM`), it is used as the voice for synthesis. Otherwise ignored (e.g. OpenAI names like `alloy`). Special value `the-voice-in-your-head` triggers the easter egg. |
-| `model`           | string | Accepted for compatibility. Ignored by this server. |
+| `model`           | string | If the value matches an ElevenLabs model ID (e.g. `eleven_multilingual_v2`), it is used for synthesis. Otherwise ignored (e.g. OpenAI names like `tts-1`). See [available models](https://elevenlabs.io/docs/api-reference/get-models). |
 | `response_format` | string | Accepted for compatibility. Ignored by this server. |
 | `instructions`    | string | Accepted for compatibility. Ignored by this server. |
 | `speed`           | number | Accepted for compatibility. Ignored by this server. |
