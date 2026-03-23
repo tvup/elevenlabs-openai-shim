@@ -16,6 +16,14 @@ Other request fields are ignored, except for the special `voice` value
 This makes it possible for existing clients to switch the endpoint URL to
 this service while continuing to send the same general request shape.
 
+API key handling
+----------------
+Bearer tokens in the Authorization header are only forwarded to ElevenLabs
+if they match the ElevenLabs key format (prefix ``sk_``). Tokens with other
+formats (such as OpenAI ``sk-`` keys) are ignored, and the server-configured
+``XI_API_KEY`` is used instead. This allows clients originally configured for
+OpenAI to work without changes.
+
 Setup
 -----
     python3 -m venv .venv
@@ -172,13 +180,14 @@ async def audio_speech(request: Request):
     if not DEFAULT_VOICE_ID:
         raise HTTPException(status_code=500, detail="Missing ELEVENLABS_VOICE_ID env var")
 
-    # Use API key from Authorization header if provided, otherwise fall back to server default.
+    # Only forward Bearer token to ElevenLabs if it starts with "sk_" (ElevenLabs key format).
+    # OpenAI keys (sk-...) and other tokens are ignored — server default XI_API_KEY is used instead.
     auth_header = request.headers.get("authorization", "")
-    api_key = auth_header.removeprefix("Bearer ").strip() if auth_header.lower().startswith("bearer ") else ""
+    bearer_token = auth_header.removeprefix("Bearer ").strip() if auth_header.lower().startswith("bearer ") else ""
+    api_key = bearer_token if bearer_token.startswith("sk_") else XI_API_KEY
     if not api_key:
-        api_key = XI_API_KEY
-    if not api_key:
-        raise HTTPException(status_code=500, detail="Missing API key: set XI_API_KEY env var or pass Authorization header")
+        raise HTTPException(status_code=500, detail="Missing API key: set XI_API_KEY env var or pass Authorization header with ElevenLabs key")
+    logger.info("API key source: %s", "bearer" if bearer_token.startswith("sk_") else "server-default")
 
     payload = await get_payload(request)
 
