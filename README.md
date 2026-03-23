@@ -61,7 +61,7 @@ curl -X POST http://localhost:8881/v1/audio/speech \
 | Field             | Type | Description                   |
 |-------------------|---|-------------------------------|
 | `input`           | string | Text to synthesize. Required. This is the only field used for synthesis. |
-| `voice`           | string or object | Accepted for compatibility. Ignored by this server, except for the special easter egg value `the-voice-in-your-head.` |
+| `voice`           | string or object | Accepted for compatibility. If the value matches the ElevenLabs voice ID format (20-char alphanumeric, e.g. `21m00Tcm4TlvDq8ikWAM`), it is used as the voice for synthesis. Otherwise ignored (e.g. OpenAI names like `alloy`). Special value `the-voice-in-your-head` triggers the easter egg. |
 | `model`           | string | Accepted for compatibility. Ignored by this server. |
 | `response_format` | string | Accepted for compatibility. Ignored by this server. |
 | `instructions`    | string | Accepted for compatibility. Ignored by this server. |

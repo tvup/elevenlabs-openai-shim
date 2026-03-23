@@ -65,6 +65,7 @@ themselves.
 
 import logging
 import os
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Optional
@@ -187,6 +188,11 @@ async def audio_speech(request: Request):
 
     input_text = get_input_text(payload)
 
+    # Use voice from request if it looks like an ElevenLabs voice ID (20-char alphanumeric),
+    # otherwise fall back to server default. OpenAI-style names like "alloy" are ignored.
+    req_voice = payload.get("voice")
+    voice_id = req_voice if isinstance(req_voice, str) and re.fullmatch(r"[a-zA-Z0-9]{20}", req_voice) else DEFAULT_VOICE_ID
+
     # IP-based character limit (skipped for easter egg above).
     if ALLOWED_IPS:
         client_ip = get_client_ip(request)
@@ -198,13 +204,13 @@ async def audio_speech(request: Request):
 
     logger.info(
         "TTS request: voice=%s model=%s format=%s chars=%d",
-        DEFAULT_VOICE_ID,
+        voice_id,
         DEFAULT_MODEL_ID,
         DEFAULT_FORMAT,
         len(input_text),
     )
 
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{DEFAULT_VOICE_ID}/stream?output_format={DEFAULT_FORMAT}"
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream?output_format={DEFAULT_FORMAT}"
 
     if http_client is None:
         raise HTTPException(status_code=500, detail="HTTP client is not initialized")

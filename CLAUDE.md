@@ -37,7 +37,8 @@ Both expose:
 
 ## Key Behavior
 
-- **Server-side config**: Voice, model, and output format are controlled entirely by environment variables. Client-sent `voice`, `model`, `response_format`, `speed`, `instructions`, and `stream_format` fields are accepted for compatibility but ignored.
+- **Server-side config**: Model and output format are controlled by environment variables. Client-sent `model`, `response_format`, `speed`, `instructions`, and `stream_format` fields are accepted for compatibility but ignored.
+- **Voice resolution**: If `voice` in the request matches the ElevenLabs voice ID format (20-char alphanumeric, e.g. `21m00Tcm4TlvDq8ikWAM`), it is forwarded to ElevenLabs. Otherwise (e.g. OpenAI names like `alloy`) it is ignored and `ELEVENLABS_VOICE_ID` from env is used.
 - **Input validation**: `input` is required, must be a non-empty string, max 4096 characters.
 - **Output format**: Controlled by `DEFAULT_FORMAT` (ElevenLabs format) and `DEFAULT_CONTENT_TYPE` (HTTP response content type). Default is `pcm_24000` with `audio/wav` content type. Note: `pcm_24000` returns raw headerless PCM, not a valid WAV file.
 - **Easter egg**: Voice `the-voice-in-your-head` returns a canned audio clip from `static/the_force.pcm` without calling ElevenLabs.
