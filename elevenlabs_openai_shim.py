@@ -114,7 +114,6 @@ async def get_payload(request: Request) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="Request body must be a JSON object")
 
-    logger.info("Incoming request body: %s", payload)
     return payload
 
 
